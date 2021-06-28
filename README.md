@@ -62,6 +62,9 @@ func main() {
 }
 ```
 
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/knadh/go-pop3)](https://pkg.go.dev/github.com/knadh/go-pop3)
+
+
 ### To-do: tests
 Setup a Docker test environment that runs [InBucket](https://github.com/inbucket/inbucket) POP3 + SMTP server to run a dummy POP3 server and test all the commands in the lib.
 
