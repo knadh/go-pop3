@@ -412,12 +412,12 @@ func parseResp(b []byte) ([]byte, error) {
 
 	if bytes.Equal(b, respOK) {
 		return nil, nil
+	} else if bytes.HasPrefix(b, respOKInfo) {
+		return bytes.TrimPrefix(b, respOKInfo), nil
 	} else if bytes.Equal(b, respErr) {
 		return nil, errors.New("unknown error (no info specified in response)")
 	} else if bytes.HasPrefix(b, respErrInfo) {
 		return nil, errors.New(string(bytes.TrimPrefix(b, respErrInfo)))
-	} else if !bytes.HasPrefix(b, respOKInfo) {
-		return bytes.TrimPrefix(b, respOKInfo), nil
 	} else {
 		return nil, fmt.Errorf("unknown response: %s. Neither -ERR, nor +OK", string(b))
 	}
