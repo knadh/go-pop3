@@ -46,6 +46,11 @@ type MessageID struct {
 
 var (
 	lineBreak = []byte("\r\n")
+
+	respOK      = []byte("+OK")   // `+OK` without additional info
+	respOKInfo  = []byte("+OK ")  // `+OK <info>`
+	respErr     = []byte("-ERR")  // `-ERR` without additional info
+	respErrInfo = []byte("-ERR ") // `-ERR <info>`
 )
 
 // New returns a new client object using an existing connection.
@@ -91,7 +96,7 @@ func (c *Client) NewConn() (*Conn, error) {
 		w:    bufio.NewWriter(conn),
 	}
 
-	//Verify the connection by reading the welcome +OK greeting.
+	// Verify the connection by reading the welcome +OK greeting.
 	if _, err := pCon.ReadOne(); err != nil {
 		return nil, err
 	}
@@ -401,20 +406,19 @@ func (c *Conn) Quit() error {
 // and returns an error with the message that succeeds the error indicator.
 // For success `+OK` messages, it returns the remaining response bytes.
 func parseResp(b []byte) ([]byte, error) {
-	var (
-		bOK  = []byte("+OK ")
-		bErr = []byte("-ERR ")
-	)
-
 	if len(b) == 0 {
 		return nil, nil
 	}
 
-	if bytes.HasPrefix(b, bErr) {
-		return nil, errors.New(string(bytes.TrimPrefix(b, bErr)))
-	} else if !bytes.HasPrefix(b, bOK) {
-		return nil, errors.New("unknown response. Neither -ERR, nor +OK.")
+	if bytes.Equal(b, respOK) {
+		return nil, nil
+	} else if bytes.HasPrefix(b, respOKInfo) {
+		return bytes.TrimPrefix(b, respOKInfo), nil
+	} else if bytes.Equal(b, respErr) {
+		return nil, errors.New("unknown error (no info specified in response)")
+	} else if bytes.HasPrefix(b, respErrInfo) {
+		return nil, errors.New(string(bytes.TrimPrefix(b, respErrInfo)))
+	} else {
+		return nil, fmt.Errorf("unknown response: %s. Neither -ERR, nor +OK", string(b))
 	}
-
-	return bytes.TrimPrefix(b, bOK), nil
 }
