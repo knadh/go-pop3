@@ -10,6 +10,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/emersion/go-message"
 )
@@ -28,10 +29,14 @@ type Conn struct {
 
 // Opt represents the client configuration.
 type Opt struct {
-	Host          string `json:"host"`
-	Port          int    `json:"port"`
-	TLSEnabled    bool   `json:"tls_enabled"`
-	TLSSkipVerify bool   `json:"tls_skip_verify"`
+	Host string `json:"host"`
+	Port int    `json:"port"`
+
+	// Default is 3 seconds.
+	DialTimeout time.Duration `json:"dial_timeout"`
+
+	TLSEnabled    bool `json:"tls_enabled"`
+	TLSSkipVerify bool `json:"tls_skip_verify"`
 }
 
 // MessageID contains the ID and size of an individual message.
@@ -55,6 +60,10 @@ var (
 
 // New returns a new client object using an existing connection.
 func New(opt Opt) *Client {
+	if opt.DialTimeout < time.Millisecond {
+		opt.DialTimeout = time.Second * 3
+	}
+
 	return &Client{
 		opt: opt,
 	}
@@ -63,31 +72,25 @@ func New(opt Opt) *Client {
 // NewConn creates and returns live POP3 server connection.
 func (c *Client) NewConn() (*Conn, error) {
 	var (
-		conn net.Conn
-		err  error
-
 		addr = fmt.Sprintf("%s:%d", c.opt.Host, c.opt.Port)
 	)
 
+	conn, err := net.DialTimeout("tcp", addr, c.opt.DialTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	// No TLS.
 	if c.opt.TLSEnabled {
 		// Skip TLS host verification.
-		tlsCfg := &tls.Config{}
+		tlsCfg := tls.Config{}
 		if c.opt.TLSSkipVerify {
 			tlsCfg.InsecureSkipVerify = c.opt.TLSSkipVerify
 		} else {
 			tlsCfg.ServerName = c.opt.Host
 		}
 
-		conn, err = tls.Dial("tcp", addr, tlsCfg)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// No TLS.
-		conn, err = net.Dial("tcp", addr)
-		if err != nil {
-			return nil, err
-		}
+		conn = tls.Client(conn, &tlsCfg)
 	}
 
 	pCon := &Conn{
