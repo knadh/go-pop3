@@ -355,6 +355,13 @@ func (c *Conn) Retr(msgID int) (*message.Entity, error) {
 	return m, nil
 }
 
+// RetrRaw downloads a message by the given msgID and returns the raw []byte
+// of the entire message.
+func (c *Conn) RetrRaw(msgID int) (*bytes.Buffer, error) {
+	b, err := c.Cmd("RETR", true, msgID)
+	return b, err
+}
+
 // Top retrieves a message by its ID with full headers and numLines lines of the body.
 func (c *Conn) Top(msgID int, numLines int) (*message.Entity, error) {
 	b, err := c.Cmd("TOP", true, msgID, numLines)
