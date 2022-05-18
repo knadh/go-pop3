@@ -80,6 +80,11 @@ func (c *Client) NewConn() (*Conn, error) {
 		return nil, err
 	}
 
+	// sets the read and write deadlines associated with the connection.
+	if err = conn.SetDeadline(time.Now().Add(c.opt.DialTimeout)); err != nil {
+		return nil, err
+	}
+
 	// No TLS.
 	if c.opt.TLSEnabled {
 		// Skip TLS host verification.
