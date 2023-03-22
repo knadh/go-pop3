@@ -6,50 +6,14 @@ import (
 	"io"
 	"log"
 	"net/smtp"
-	"os/exec"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/emersion/go-message"
 	"github.com/emersion/go-message/mail"
 )
 
 const MSG = `Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do.`
-
-var (
-	containerId = ""
-	c           *Conn
-)
-
-func setUp() error {
-	cmd := exec.Command("docker", "run", "-d", "--name", "inbucket", "-p", "9000:9000", "-p", "2500:2500", "-p", "1100:1100", "inbucket/inbucket")
-	out, err := cmd.Output()
-	if err != nil {
-		return err
-	}
-	containerId = string(out[:len(out)-1])
-	time.Sleep(2 * time.Second)
-	// adding new messages to test user's inbox
-	return add_messages(5)
-}
-
-func tearDown() {
-	cmd := exec.Command("docker", "stop", containerId)
-	err := cmd.Run()
-	if err != nil {
-		fmt.Println("error stoping container")
-		log.Fatal(err)
-	}
-	fmt.Printf("%s stopped successfully", containerId[:5])
-	cmd = exec.Command("docker", "rm", containerId)
-	err = cmd.Run()
-	if err != nil {
-		fmt.Println("error removing container")
-		log.Fatal(err)
-	}
-	fmt.Printf("%s removed successfully", containerId[:5])
-}
 
 // n represents number of messages to add to the testuser's inbox
 func add_messages(n int) error {
@@ -118,38 +82,28 @@ func readAndCompareMessageBody(m *message.Entity, msg string) error {
 }
 
 func TestAll(t *testing.T) {
-	err := setUp()
-	if err != nil {
-		t.Fatal("unable to run inbucket docker container", err)
-	}
 
-	c, err = getConnection()
+	c, err := getConnection()
 	if err != nil {
 		t.Fatal("error establishing connection to pop3 server ", err)
 	}
 
-	defer tearDown()
+	err = add_messages(5)
+	if err != nil {
+		t.Fatal("unable to send messages to the mail server", err)
+	}
 
 	// testing Auth
 	if err := c.Auth("recipient", "password"); err != nil {
 		t.Fatal(err)
 	}
 
-	// // testing User
-	// if err := c.User("recipient"); err != nil {
-	// 	t.Fatal(err)
-	// }
-	// // testing Pass
-	// if err := c.Pass("password"); err != nil {
-	// 	t.Fatal(err)
-	// }
-
 	// testing Stat
 	count, size, err := c.Stat()
 	if err != nil {
 		t.Fatal("error using Stat", err)
 	}
-	fmt.Printf("count: %d, size: %d", count, size)
+	log.Printf("count: %d, size: %d\n", count, size)
 
 	// testing Uidl
 	msgIds, err := c.Uidl(0)

@@ -1,0 +1,17 @@
+name: CI
+
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    services:
+      mail-server:
+        image: inbucket/inbucket
+        ports:
+           - 9000:9000
+           - 2500:2500
+           - 1100:1100
+    steps:
+    - uses: actions/checkout@v1
+    - name: testing
+      run: go test .
