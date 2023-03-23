@@ -67,16 +67,13 @@ func readAndCompareMessageBody(m *message.Entity, msg string) error {
 				return err
 			}
 			if !strings.EqualFold(string(b), msg) {
-				log.Println(b)
-				log.Println([]byte(msg))
-				log.Println(len(b), len([]byte(msg)))
 				return fmt.Errorf("expected message body:\n%sreceived:\n%s", msg, string(b))
 			}
 		}
 		return nil
 	} else {
 		t, _, _ := m.Header.ContentType()
-		fmt.Println("This is a non-multipart message with type", t)
+		log.Println("This is a non-multipart message with type", t)
 		return nil
 	}
 }
@@ -108,7 +105,7 @@ func TestAll(t *testing.T) {
 	// testing Uidl
 	msgIds, err := c.Uidl(0)
 	if err != nil {
-		log.Fatal("error using Uidl(0)", err)
+		t.Fatal("error using Uidl(0)", err)
 	}
 
 	if len(msgIds) != count {
@@ -117,7 +114,7 @@ func TestAll(t *testing.T) {
 
 	msgId, err := c.Uidl(msgIds[0].ID)
 	if err != nil {
-		log.Fatal("error using Uidl for positive message ID", err)
+		t.Fatal("error using Uidl for positive message ID", err)
 	}
 	if len(msgId) != 1 {
 		t.Fatalf("Uidl returns a list of (message ID, message UID) pairs. If the optional msgID is > 0, then only that particular message is listed but it returned %d pair\n", len(msgId))
@@ -142,10 +139,10 @@ func TestAll(t *testing.T) {
 	// testing Retr
 	m, err := c.Retr(msgs[0].ID)
 	if err != nil {
-		log.Fatal("error using Retr", err)
+		t.Fatal("error using Retr", err)
 	}
 	if m.Header.Get("subject") != "Subject 0" {
-		log.Fatalf("Retr returned wrong subject returned: %s, expected: Subject 0 ", m.Header.Get("subject"))
+		t.Fatalf("Retr returned wrong subject returned: %s, expected: Subject 0 ", m.Header.Get("subject"))
 	}
 	err = readAndCompareMessageBody(m, "Message 0.\r\n"+MSG+"\r\n")
 	if err != nil {
@@ -155,7 +152,7 @@ func TestAll(t *testing.T) {
 	// testing RetrRaw
 	mb, err := c.RetrRaw(msgs[0].ID)
 	if err != nil {
-		log.Fatal("error using RetrRaw", err)
+		t.Fatal("error using RetrRaw", err)
 	}
 	b := mb.Bytes()
 	if !bytes.Contains(b, []byte("Message 0.\r\n"+MSG+"\r\n")) {
@@ -194,7 +191,7 @@ func TestAll(t *testing.T) {
 	}
 	msgs, _ = c.List(0)
 	if len(msgs) != 5 {
-		t.Fatalf("after Rsetin number of messages in inbox should be 5 but got %d", len(msgs))
+		t.Fatalf("after Rseting number of messages in inbox should be 5 but got %d", len(msgs))
 	}
 
 	// testing Quit
