@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -22,9 +23,11 @@ type Client struct {
 
 // Conn is a stateful connection with the POP3 server/
 type Conn struct {
-	conn net.Conn
-	r    *bufio.Reader
-	w    *bufio.Writer
+	conn         net.Conn
+	readTimeout  time.Duration
+	writeTimeout time.Duration
+	r            *bufio.Reader
+	w            *bufio.Writer
 }
 
 // Opt represents the client configuration.
@@ -34,6 +37,10 @@ type Opt struct {
 
 	// Default is 3 seconds.
 	DialTimeout time.Duration `json:"dial_timeout"`
+	// A zero value Read will not timeout.
+	ReadTimeout time.Duration `json:"read_timeout"`
+	// A zero value Write will not timeout.
+	WriteTimeout time.Duration `json:"write_timeout"`
 
 	TLSEnabled    bool `json:"tls_enabled"`
 	TLSSkipVerify bool `json:"tls_skip_verify"`
@@ -94,9 +101,21 @@ func (c *Client) NewConn() (*Conn, error) {
 	}
 
 	pCon := &Conn{
-		conn: conn,
-		r:    bufio.NewReader(conn),
-		w:    bufio.NewWriter(conn),
+		conn:         conn,
+		readTimeout:  c.opt.ReadTimeout,
+		writeTimeout: c.opt.WriteTimeout,
+		r:            bufio.NewReader(conn),
+		w:            bufio.NewWriter(conn),
+	}
+
+	// set the read deadlines associated with the connection.
+	if err = pCon.setReadDeadline(); err != nil {
+		return nil, err
+	}
+
+	// set to write deadlines associated with the connection.
+	if err = pCon.setWriteDeadline(); err != nil {
+		return nil, err
 	}
 
 	// Verify the connection by reading the welcome +OK greeting.
@@ -107,9 +126,47 @@ func (c *Client) NewConn() (*Conn, error) {
 	return pCon, nil
 }
 
+func (c *Conn) setReadDeadline() error {
+	if c.readTimeout == 0 {
+		return nil
+	}
+
+	return c.conn.SetReadDeadline(time.Now().Add(c.readTimeout))
+}
+
+func (c *Conn) resetReadDeadline(err error) error {
+	if errors.Is(err, os.ErrDeadlineExceeded) {
+		return c.setReadDeadline()
+	}
+
+	return nil
+}
+
+func (c *Conn) setWriteDeadline() error {
+	if c.writeTimeout == 0 {
+		return nil
+	}
+
+	return c.conn.SetWriteDeadline(time.Now().Add(c.writeTimeout))
+}
+
+func (c *Conn) resetWriteDeadline(err error) error {
+	if errors.Is(err, os.ErrDeadlineExceeded) {
+		return c.setWriteDeadline()
+	}
+
+	return nil
+}
+
 // Send sends a POP3 command to the server. The given comand is suffixed with "\r\n".
 func (c *Conn) Send(b string) error {
-	if _, err := c.w.WriteString(b + "\r\n"); err != nil {
+	_, err := c.w.WriteString(b + "\r\n")
+	// Reset write deadlines
+	if err = c.resetWriteDeadline(err); err != nil {
+		return err
+	}
+
+	if err != nil {
 		return err
 	}
 	return c.w.Flush()
@@ -156,6 +213,11 @@ func (c *Conn) Cmd(cmd string, isMulti bool, args ...interface{}) (*bytes.Buffer
 // ReadOne reads a single line response from the conn.
 func (c *Conn) ReadOne() ([]byte, error) {
 	b, _, err := c.r.ReadLine()
+	// Reset read deadlines
+	if err = c.resetReadDeadline(err); err != nil {
+		return nil, err
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -171,6 +233,10 @@ func (c *Conn) ReadAll() (*bytes.Buffer, error) {
 
 	for {
 		b, _, err := c.r.ReadLine()
+		// Reset read deadlines
+		if err = c.resetReadDeadline(err); err != nil {
+			return nil, err
+		}
 		if err != nil {
 			return nil, err
 		}
