@@ -17,7 +17,8 @@ import (
 
 // Client implements a Client e-mail client.
 type Client struct {
-	opt Opt
+	opt    Opt
+	dialer *net.Dialer
 }
 
 // Conn is a stateful connection with the POP3 server/
@@ -34,6 +35,7 @@ type Opt struct {
 
 	// Default is 3 seconds.
 	DialTimeout time.Duration `json:"dial_timeout"`
+	Dialer      *net.Dialer   `json:"-"`
 
 	TLSEnabled    bool `json:"tls_enabled"`
 	TLSSkipVerify bool `json:"tls_skip_verify"`
@@ -64,8 +66,13 @@ func New(opt Opt) *Client {
 		opt.DialTimeout = time.Second * 3
 	}
 
+	dialer := opt.Dialer
+	if dialer == nil {
+		dialer = &net.Dialer{Timeout: opt.DialTimeout}
+	}
+
 	return &Client{
-		opt: opt,
+		opt: opt, dialer: dialer,
 	}
 }
 
@@ -75,7 +82,7 @@ func (c *Client) NewConn() (*Conn, error) {
 		addr = fmt.Sprintf("%s:%d", c.opt.Host, c.opt.Port)
 	)
 
-	conn, err := net.DialTimeout("tcp", addr, c.opt.DialTimeout)
+	conn, err := c.dialer.Dial("tcp", addr)
 	if err != nil {
 		return nil, err
 	}
