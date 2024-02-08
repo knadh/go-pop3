@@ -18,7 +18,7 @@ import (
 // Client implements a Client e-mail client.
 type Client struct {
 	opt    Opt
-	dialer *net.Dialer
+	dialer Dialer
 }
 
 // Conn is a stateful connection with the POP3 server/
@@ -35,10 +35,14 @@ type Opt struct {
 
 	// Default is 3 seconds.
 	DialTimeout time.Duration `json:"dial_timeout"`
-	Dialer      *net.Dialer   `json:"-"`
+	Dialer      Dialer        `json:"-"`
 
 	TLSEnabled    bool `json:"tls_enabled"`
 	TLSSkipVerify bool `json:"tls_skip_verify"`
+}
+
+type Dialer interface {
+	Dial(network, address string) (net.Conn, error)
 }
 
 // MessageID contains the ID and size of an individual message.
