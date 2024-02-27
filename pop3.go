@@ -419,15 +419,10 @@ func (c *Conn) Noop() error {
 // Message deletions (DELE command) are only excuted by the server on a graceful
 // quit and close.
 func (c *Conn) Quit() error {
+	defer c.conn.Close()
 	if _, err := c.Cmd("QUIT", false); err != nil {
 		return err
 	}
-	return c.conn.Close()
-}
-
-// Close close the underlying tcp connection
-func (c *Conn) Close() error {
-	return c.conn.Close()
 }
 
 // parseResp checks if the response is an error that starts with `-ERR`
