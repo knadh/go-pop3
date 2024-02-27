@@ -425,6 +425,11 @@ func (c *Conn) Quit() error {
 	return c.conn.Close()
 }
 
+// Close close the underlying tcp connection
+func (c *Conn) Close() error {
+	return c.conn.Close()
+}
+
 // parseResp checks if the response is an error that starts with `-ERR`
 // and returns an error with the message that succeeds the error indicator.
 // For success `+OK` messages, it returns the remaining response bytes.
