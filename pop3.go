@@ -52,12 +52,12 @@ type MessageID struct {
 var (
 	lineBreak = []byte("\r\n")
 
-	respOK      = []byte("+OK")   // `+OK` without additional info
-	respOKToContinue      = []byte("+")   // `+`
-	respOKInfo  = []byte("+OK ")  // `+OK <info>`
-	respOKToContinueInfo  = []byte("+ ")  // `+ <info>`
-	respErr     = []byte("-ERR")  // `-ERR` without additional info
-	respErrInfo = []byte("-ERR ") // `-ERR <info>`
+	respOK               = []byte("+OK")   // `+OK` without additional info
+	respOKToContinue     = []byte("+")     // `+`
+	respOKInfo           = []byte("+OK ")  // `+OK <info>`
+	respOKToContinueInfo = []byte("+ ")    // `+ <info>`
+	respErr              = []byte("-ERR")  // `-ERR` without additional info
+	respErrInfo          = []byte("-ERR ") // `-ERR <info>`
 )
 
 // New returns a new client object using an existing connection.
@@ -90,6 +90,16 @@ func (c *Client) NewConn() (*Conn, error) {
 			tlsCfg.InsecureSkipVerify = c.opt.TLSSkipVerify
 		} else {
 			tlsCfg.ServerName = c.opt.Host
+			tlsCfg.CipherSuites = []uint16{
+				tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+				tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+				tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
+				tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+				tls.TLS_RSA_WITH_AES_128_CBC_SHA,
+			}
 		}
 
 		conn = tls.Client(conn, &tlsCfg)
