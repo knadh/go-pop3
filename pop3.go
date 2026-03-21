@@ -255,6 +255,9 @@ func (c *Conn) Stat() (int, int, error) {
 
 	// count size
 	f := bytes.Fields(b.Bytes())
+	if len(f) < 2 {
+		return 0, 0, fmt.Errorf("malformed STAT response")
+	}
 
 	// Total number of messages.
 	count, err := strconv.Atoi(string(f[0]))
@@ -302,7 +305,7 @@ func (c *Conn) List(msgID int) ([]MessageID, error) {
 	for _, l := range lines {
 		// id size
 		f := bytes.Fields(l)
-		if len(f) == 0 {
+		if len(f) < 2 {
 			break
 		}
 
@@ -350,7 +353,7 @@ func (c *Conn) Uidl(msgID int) ([]MessageID, error) {
 	for _, l := range lines {
 		// id size
 		f := bytes.Fields(l)
-		if len(f) == 0 {
+		if len(f) < 2 {
 			break
 		}
 
