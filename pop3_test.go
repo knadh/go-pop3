@@ -1,6 +1,7 @@
 package pop3
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -79,7 +80,6 @@ func readAndCompareMessageBody(m *message.Entity, msg string) error {
 }
 
 func TestAll(t *testing.T) {
-
 	c, err := getConnection()
 	if err != nil {
 		t.Fatal("error establishing connection to pop3 server ", err)
@@ -198,5 +198,110 @@ func TestAll(t *testing.T) {
 	err = c.Quit()
 	if err != nil {
 		t.Fatal("error using Quit method", err)
+	}
+}
+
+// newTestConn creates a Conn with a bufio.Reader wrapping the given data.
+func newTestConn(data string) *Conn {
+	return &Conn{
+		r: bufio.NewReader(strings.NewReader(data)),
+	}
+}
+
+func TestReadAllMultiline(t *testing.T) {
+	// ".." should become "." and "..foo" should become ".foo".
+	input := "line1\r\n..dot-prefixed\r\n...\r\nnormal line\r\n.\r\n"
+	c := newTestConn(input)
+
+	buf, err := c.ReadAll()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expected := "line1\r\n.dot-prefixed\r\n..\r\nnormal line\r\n"
+	if buf.String() != expected {
+		t.Fatalf("ReadAll dot-destuffing failed.\nexpected: %q\ngot:      %q", expected, buf.String())
+	}
+}
+
+func TestReadAllLongLines(t *testing.T) {
+	longLine := strings.Repeat("A", 5000)
+	input := longLine + "\r\n.\r\n"
+	c := newTestConn(input)
+
+	buf, err := c.ReadAll()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expected := longLine + "\r\n"
+	if buf.String() != expected {
+		t.Fatalf("ReadAll long line failed. expected length %d, got %d", len(expected), len(buf.String()))
+	}
+}
+
+func TestReadAllMultipartContentDisposition(t *testing.T) {
+	boundary := "----=_Part_123"
+	rawMsg := fmt.Sprintf("MIME-Version: 1.0\r\n"+
+		"Content-Type: multipart/mixed; boundary=\"%s\"\r\n"+
+		"\r\n"+
+		"--%s\r\n"+
+		"Content-Type: text/plain\r\n"+
+		"\r\n"+
+		"Hello\r\n"+
+		"--%s\r\n"+
+		"Content-Type: application/octet-stream\r\n"+
+		"Content-Disposition: attachment; filename=\"test.txt\"\r\n"+
+		"\r\n"+
+		"file content\r\n"+
+		"--%s--\r\n", boundary, boundary, boundary, boundary)
+
+	// Add the final POP3 terminator.
+	input := rawMsg + ".\r\n"
+
+	c := newTestConn(input)
+	buf, err := c.ReadAll()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	entity, err := message.Read(buf)
+	if err != nil {
+		t.Fatal("failed to parse MIME message:", err)
+	}
+
+	rd := entity.MultipartReader()
+	if rd == nil {
+		t.Fatal("expected multipart message, got nil reader")
+	}
+
+	i := 0
+	for {
+		p, err := rd.NextPart()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal("error reading part:", err)
+		}
+
+		if i == 1 {
+			// Second part should have `Content-Disposition``.
+			dispVal, params, err := p.Header.ContentDisposition()
+			if err != nil {
+				t.Fatal("error getting Content-Disposition:", err)
+			}
+			if dispVal != "attachment" {
+				t.Fatalf("expected Content-Disposition 'attachment', got %q", dispVal)
+			}
+			if params["filename"] != "test.txt" {
+				t.Fatalf("expected filename 'test.txt', got %q", params["filename"])
+			}
+		}
+		i++
+	}
+
+	if i < 2 {
+		t.Fatalf("expected at least 2 parts, got %d", i)
 	}
 }

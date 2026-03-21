@@ -168,10 +168,13 @@ func (c *Conn) Cmd(cmd string, isMulti bool, args ...interface{}) (*bytes.Buffer
 
 // ReadOne reads a single line response from the conn.
 func (c *Conn) ReadOne() ([]byte, error) {
-	b, _, err := c.r.ReadLine()
+	b, err := c.r.ReadBytes('\n')
 	if err != nil {
 		return nil, err
 	}
+
+	b = bytes.TrimSuffix(b, []byte("\r\n"))
+	b = bytes.TrimSuffix(b, []byte("\n"))
 
 	r, err := parseResp(b)
 	return r, err
@@ -183,17 +186,29 @@ func (c *Conn) ReadAll() (*bytes.Buffer, error) {
 	buf := &bytes.Buffer{}
 
 	for {
-		b, _, err := c.r.ReadLine()
+		line, err := c.r.ReadBytes('\n')
 		if err != nil {
 			return nil, err
 		}
 
+		// Strip the trailing protocol line break.
+		line = bytes.TrimSuffix(line, []byte("\r\n"))
+		line = bytes.TrimSuffix(line, []byte("\n"))
+
 		// "." indicates the end of a multi-line response.
-		if bytes.Equal(b, []byte(".")) {
+		if bytes.Equal(line, []byte(".")) {
 			break
 		}
 
-		if _, err := buf.Write(b); err != nil {
+		// Remove the leading dot from lines starting with ".".
+		// Spec "byte-stuffs" lines starting with "." by prefixing them with an additional dot
+		// to prevent mis-interpretation of the line as the end of the multi-line response.
+		// So, remove the leading dot.
+		if bytes.HasPrefix(line, []byte(".")) {
+			line = line[1:]
+		}
+
+		if _, err := buf.Write(line); err != nil {
 			return nil, err
 		}
 		if _, err := buf.Write(lineBreak); err != nil {
