@@ -142,7 +142,7 @@ func (c *Conn) Cmd(cmd string, isMulti bool, args ...interface{}) (*bytes.Buffer
 		format := " " + strings.TrimRight(strings.Repeat("%v ", len(args)), " ")
 
 		// CMD arg1 argn ...\r\n
-		cmdLine = fmt.Sprintf(cmd+format, args...)
+		cmdLine = cmd + fmt.Sprintf(format, args...)
 	} else {
 		cmdLine = cmd
 	}
