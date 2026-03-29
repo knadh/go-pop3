@@ -57,6 +57,7 @@ type MessageID struct {
 
 var (
 	lineBreak = []byte("\r\n")
+	utf8BOM   = []byte{0xEF, 0xBB, 0xBF}
 
 	respOK      = []byte("+OK")   // `+OK` without additional info
 	respOKInfo  = []byte("+OK ")  // `+OK <info>`
@@ -376,7 +377,9 @@ func (c *Conn) Retr(msgID int) (*message.Entity, error) {
 		return nil, err
 	}
 
-	m, err := message.Read(b)
+	// Strip UTF-8 BOM if present. Some mail servers/proxies like Office 365 prepend this.
+	raw := bytes.TrimPrefix(b.Bytes(), utf8BOM)
+	m, err := message.Read(bytes.NewReader(raw))
 	if err != nil {
 		if !message.IsUnknownCharset(err) {
 			return nil, err
@@ -400,7 +403,9 @@ func (c *Conn) Top(msgID int, numLines int) (*message.Entity, error) {
 		return nil, err
 	}
 
-	m, err := message.Read(b)
+	// Strip UTF-8 BOM if present. Some mail servers/proxies like Office 365 prepend this.
+	raw := bytes.TrimPrefix(b.Bytes(), utf8BOM)
+	m, err := message.Read(bytes.NewReader(raw))
 	if err != nil {
 		return nil, err
 	}
